@@ -8,7 +8,7 @@
 #define PASSWD "18811796676"   //AP密码
 #define HOST_PORT 8080        //约定端口
 
-int lost_cnt; //丢包计数
+int lost_cnt = CNTNUM; //丢包计数
 uint8_t udp_id = 0; //udp号，默认0
 byte trigPin = 6;   //超声波触发引脚
 byte echoPin = 7;   //超声波接收引脚
@@ -26,7 +26,7 @@ void setup() {
 
   //设置led
   strip.begin();
-  strip.setPixelColor(0, strip.Color(255, 0, 0));
+  strip.setPixelColor(0, strip.Color(0, 255, 0));
   strip.show();
 
   //设置wifi通信
@@ -60,16 +60,18 @@ void loop() {
 
   //LED指示控制状态
   if(lost_cnt < CUTNUM)
-    strip.setPixelColor(0, strip.Color(0, 255, 0));
-  else
     strip.setPixelColor(0, strip.Color(255, 0, 0));
+  else
+    strip.setPixelColor(0, strip.Color(0, 255, 0));
   strip.show();
+  Serial.println(lost_cnt);
 
   //超声波测距
   digitalWrite(trigPin, HIGH);
   delayMicroseconds(10);
   digitalWrite(trigPin, LOW);
   long dist = pulseIn(echoPin, HIGH, TIMEOUT_DIST);
+  Serial.print("dist:");
   Serial.println(dist);
 
   //将距离发送，写在包的前四个字节
