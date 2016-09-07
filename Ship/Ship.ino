@@ -2,34 +2,37 @@
 #include <ESP8266.h>
 #include <Servo.h>
 
-#define LEDPIN 10  //led引脚
-#define CUTNUM 20 //最大忍受的丢包数量
 #define SSID "luoyicheng"     //AP名
 #define PASSWD "18811796676"  //AP密码
-#define HOST_PORT 8080        //约定端口
-#define PIN_MOTOR_B1 8   //马达引脚
+#define HOST_PORT 8080    //约定端口
+#define CUTNUM 20         //最大忍受的丢包数量
+#define PIN_LED 10        //led引脚
+#define PIN_MOTOR_B1 8    //马达引脚
 #define PIN_MOTOR_B2 6
 #define PIN_MOTOR_A1 7
 #define PIN_MOTOR_A2 5
-#define PIN_PIR A2  //人体传感器
+#define PIN_RADAR_TRIG 12 //雷达超声波触发引脚
+#define PIN_RADAR_ECHO 13 //雷达超声波接收引脚
+#define PIN_SONAR_TRIG 2  //水下超声波触发
+#define PIN_SONAR_ECHO 3  //水深超声波接收
+#define PIN_SERVO SDA     //方向舵机IIC,SDA=18
+#define PIN_RADAR 19      //雷达舵机IIC
+#define PIN_PIR A2        //人体传感器
 
 int lost_cnt = CUTNUM; //丢包计数
 uint8_t udp_id = 0; //udp号，默认0
-byte trigPin = 12;  //雷达超声波触发引脚
-byte echoPin = 13;  //雷达超声波接收引脚
-byte trigFlg = 2;   //水下超声波触发
-byte echoFlg = 3;   //水深超声波接收
 uint8_t pos = 90;   //舵机位置
 uint8_t rdd = 0;    //雷达所指方向
-uint8_t rdv = -3;    //雷达转动速度
+uint8_t rdv = -3;   //雷达转动速度
 uint8_t vel = 0;    //马达转速
 
-Adafruit_NeoPixel strip(1, LEDPIN, NEO_RGB+NEO_KHZ800);
+Adafruit_NeoPixel strip(1, PIN_LED, NEO_RGB+NEO_KHZ800);
 ESP8266 wifi(Serial1);
 Servo duo;
 Servo rada;
 
-void setup() {
+void setup()
+{
   // put your setup code here, to run once:
   Serial.begin(9600);
   delay(1000);
@@ -40,7 +43,7 @@ void setup() {
   strip.setPixelColor(0, strip.Color(0, 255, 0));
   strip.show();
 
-//  设置wifi通信
+  //设置wifi通信
   while(!wifi.setOprToStationSoftAP());
   Serial.println("softap ok");
   Serial.println(wifi.getAPList().c_str());
@@ -58,20 +61,16 @@ void setup() {
   Serial.println("regUDP ok");
   
   //设置超声波模块
-  pinMode(trigPin, OUTPUT);
-  pinMode(echoPin, INPUT);
-  digitalWrite(trigPin, LOW);
-  pinMode(trigFlg, OUTPUT);
-  pinMode(echoFlg, INPUT);
-  digitalWrite(trigFlg, LOW);
+  pinMode(PIN_RADAR_TRIG, OUTPUT);
+  pinMode(PIN_RADAR_ECHO, INPUT);
+  digitalWrite(PIN_RADAR_TRIG, LOW);
+  pinMode(PIN_SONAR_TRIG, OUTPUT);
+  pinMode(PIN_SONAR_ECHO, INPUT);
+  digitalWrite(PIN_SONAR_TRIG, LOW);
 
-  //设置舵机SDA=18
-  duo.attach(SDA);
-  Serial.print("SDA");
-  Serial.println(SDA);
-
-  //设置雷达机
-  rada.attach(19);
+  //设置舵机
+  duo.attach(PIN_SERVO);
+  rada.attach(PIN_RADAR);
 
   //设置马达
   pinMode(PIN_MOTOR_B1, OUTPUT);
@@ -85,11 +84,12 @@ void setup() {
   strip.setPixelColor(0, strip.Color(255, 0, 0));
 }
 
-#define TIMEOUT_DIST 10000  //测距离的可忍受最大延时
-#define TIMEOUT_WIFI 500  //通信包传输的最大可接受延时
-#define BUFLEN 50   //数据包大小
+#define TIMEOUT_DIST 1000   //测距离的可忍受最大延时
+#define TIMEOUT_WIFI 500    //通信包传输的最大可接受延时
+#define BUFLEN 50           //数据包大小
 
-void loop() {
+void loop()
+{
   // put your main code here, to run repeatedly:
 
   //LED指示控制状态
@@ -101,21 +101,20 @@ void loop() {
   Serial.println(lost_cnt);
 
   //超声波测距
-  digitalWrite(trigPin, HIGH);
+  digitalWrite(PIN_RADAR_TRIG, HIGH);
   delayMicroseconds(10);
-  digitalWrite(trigPin, LOW);
-  long dist = pulseIn(echoPin, HIGH, TIMEOUT_DIST);
-  digitalWrite(trigFlg, HIGH);
+  digitalWrite(PIN_RADAR_TRIG, LOW);
+  long dist = pulseIn(PIN_RADAR_ECHO, HIGH, TIMEOUT_DIST);
+  digitalWrite(PIN_SONAR_TRIG, HIGH);
   delayMicroseconds(10);
-  digitalWrite(trigFlg, LOW);
-  long deep = pulseIn(echoFlg, HIGH, TIMEOUT_DIST);
+  digitalWrite(PIN_SONAR_TRIG, LOW);
+  long deep = pulseIn(PIN_SONAR_ECHO, HIGH, TIMEOUT_DIST);
   Serial.print("dist:");
   Serial.println(deep);
 
-//发送数据，格式0A [1~4为超声波测得距离] 5舵方向 6雷达方向 7电机速度 8水深 9生命活动
+  //发送数据，格式0A [1~4为超声波测得距离] 5舵方向 6雷达方向 7电机速度 8水深 9生命活动
   static uint8_t buf_send[BUFLEN] = {65};
   memcpy(buf_send+1, (const char*)&dist, sizeof(long));
-  //memcpy(buf_send+5, (const char*)&pos, sizeof(uint8_t));
   buf_send[5] = pos;
   buf_send[6] = rdd;
   buf_send[7] = vel;
