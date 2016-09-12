@@ -20,10 +20,10 @@
 #define PIN_PIR A2        //人体传感器
 
 int lost_cnt = CUTNUM; //丢包计数
-uint8_t udp_id = 0; //udp号，默认0
+const uint8_t udp_id = 0; //udp号，默认0
 uint8_t pos = 90;   //舵机位置
 uint8_t rdd = 0;    //雷达所指方向
-uint8_t rdv = -3;   //雷达转动速度
+char rdv = -3;   //雷达转动速度
 uint8_t vel = 0;    //马达转速
 
 Adafruit_NeoPixel strip(1, PIN_LED, NEO_RGB+NEO_KHZ800);
@@ -84,7 +84,7 @@ void setup()
   strip.setPixelColor(0, strip.Color(255, 0, 0));
 }
 
-#define TIMEOUT_DIST 1000   //测距离的可忍受最大延时
+#define TIMEOUT_DIST 10000   //测距离的可忍受最大延时
 #define TIMEOUT_WIFI 500    //通信包传输的最大可接受延时
 #define BUFLEN 50           //数据包大小
 
@@ -110,16 +110,18 @@ void loop()
   digitalWrite(PIN_SONAR_TRIG, LOW);
   long deep = pulseIn(PIN_SONAR_ECHO, HIGH, TIMEOUT_DIST);
   Serial.print("dist:");
+  Serial.print(dist);
+  Serial.print("\tdeep:");
   Serial.println(deep);
 
-  //发送数据，格式0A [1~4为超声波测得距离] 5舵方向 6雷达方向 7电机速度 8水深 9生命活动
+  //发送数据，格式0A [0~3为超声波测得距离] [4~7为水深] 8舵方向 9雷达方向 10电机速度 11生命活动
   static uint8_t buf_send[BUFLEN] = {65};
-  memcpy(buf_send+1, (const char*)&dist, sizeof(long));
-  buf_send[5] = pos;
-  buf_send[6] = rdd;
-  buf_send[7] = vel;
-  memcpy(buf_send+8, &deep, sizeof(long));
-  buf_send[12] = digitalRead(PIN_PIR);
+  memcpy(buf_send, &dist, sizeof(long));
+  memcpy(buf_send+4, &deep, sizeof(long));
+  buf_send[8] = pos;
+  buf_send[9] = rdd;
+  buf_send[10] = vel;
+  buf_send[11] = digitalRead(PIN_PIR);
 for(int i=0;i<13;i++)Serial.print((int)buf_send[i]),Serial.print(" ");Serial.println("");
   wifi.send(udp_id, buf_send, BUFLEN);
 
