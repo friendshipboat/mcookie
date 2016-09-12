@@ -1,6 +1,7 @@
 #include <Adafruit_NeoPixel.h>
 #include <ESP8266.h>
 #include <Servo.h>
+#include <MPU6050.h>
 
 #define SSID "luoyicheng"     //AP名
 #define PASSWD "18811796676"  //AP密码
@@ -30,6 +31,7 @@ Adafruit_NeoPixel strip(1, PIN_LED, NEO_RGB+NEO_KHZ800);
 ESP8266 wifi(Serial1);
 Servo duo;
 Servo rada;
+MPU6050 motion;
 
 void setup()
 {
@@ -81,6 +83,9 @@ void setup()
   //设置生命传感器
   pinMode(PIN_PIR, INPUT);
 
+  //设置陀螺仪
+  motion.initialize();
+
   strip.setPixelColor(0, strip.Color(255, 0, 0));
 }
 
@@ -113,6 +118,8 @@ void loop()
   Serial.print(dist);
   Serial.print("\tdeep:");
   Serial.println(deep);
+
+  //测速
 
   //发送数据，格式0A [0~3为超声波测得距离] [4~7为水深] 8舵方向 9雷达方向 10电机速度 11生命活动
   static uint8_t buf_send[BUFLEN] = {65};
