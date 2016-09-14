@@ -1,7 +1,7 @@
 #include <Adafruit_NeoPixel.h>
 #include <ESP8266.h>
 #include <Servo.h>
-#include <MPU6050.h>
+//#include <MPU6050.h>
 
 #define SSID "luoyicheng"     //AP名
 #define PASSWD "18811796676"  //AP密码
@@ -20,18 +20,12 @@
 #define PIN_RADAR 19      //雷达舵机IIC
 #define PIN_PIR A2        //人体传感器
 
-int lost_cnt = CUTNUM; //丢包计数
-const uint8_t udp_id = 0; //udp号，默认0
-uint8_t pos = 90;   //舵机位置
-uint8_t rdd = 0;    //雷达所指方向
-char rdv = -3;   //雷达转动速度
-uint8_t vel = 0;    //马达转速
-
-Adafruit_NeoPixel strip(1, PIN_LED, NEO_RGB+NEO_KHZ800);
+const uint8_t ID_UDP = 0;   //udp通道编号,默认0
+Adafruit_NeoPixel strip(1, PIN_LED, NEO_RGB+NEO_KHZ800);  //LED指示灯
 ESP8266 wifi(Serial1);
 Servo duo;
 Servo rada;
-MPU6050 motion;
+//MPU6050 motion;
 
 void setup()
 {
@@ -59,7 +53,7 @@ void setup()
   while(!wifi.enableMUX());
   Serial.println("multiple ok");
   Serial.println(wifi.getAPIp());
-  while(!wifi.registerUDP(udp_id, "192.168.137.1", HOST_PORT));
+  while(!wifi.registerUDP(ID_UDP, "192.168.137.1", HOST_PORT));
   Serial.println("regUDP ok");
   
   //设置超声波模块
@@ -84,7 +78,7 @@ void setup()
   pinMode(PIN_PIR, INPUT);
 
   //设置陀螺仪
-  motion.initialize();
+  //motion.initialize();
 
   strip.setPixelColor(0, strip.Color(255, 0, 0));
 }
@@ -92,6 +86,13 @@ void setup()
 #define TIMEOUT_DIST 10000   //测距离的可忍受最大延时
 #define TIMEOUT_WIFI 500    //通信包传输的最大可接受延时
 #define BUFLEN 50           //数据包大小
+
+int lost_cnt = CUTNUM; //丢包计数
+uint8_t pos = 90;   //舵机位置
+uint8_t rdd = 0;    //雷达所指方向
+char rdv = -3;      //雷达转动速度
+uint8_t vel = 0;    //马达转速
+//int16_t v[6];       //陀螺仪数据 
 
 void loop()
 {
@@ -120,8 +121,9 @@ void loop()
   Serial.println(deep);
 
   //测速
+  //motion.getMotion6(v, v+1, v+2, v+3, v+4, v+5);
 
-  //发送数据，格式0A [0~3为超声波测得距离] [4~7为水深] 8舵方向 9雷达方向 10电机速度 11生命活动
+  //发送数据，格式0A [0~3为超声波测得距离] [4~7为水深] 8舵方向 9雷达方向 10电机速度 11生命活动 //[12~23为陀螺仪数据]
   static uint8_t buf_send[BUFLEN] = {65};
   memcpy(buf_send, &dist, sizeof(long));
   memcpy(buf_send+4, &deep, sizeof(long));
@@ -129,8 +131,9 @@ void loop()
   buf_send[9] = rdd;
   buf_send[10] = vel;
   buf_send[11] = digitalRead(PIN_PIR);
-for(int i=0;i<13;i++)Serial.print((int)buf_send[i]),Serial.print(" ");Serial.println("");
-  wifi.send(udp_id, buf_send, BUFLEN);
+  //memcpy(buf_send + 12, v, sizeof v);
+for(int i=0;i<24;i++)Serial.print((int)buf_send[i]),Serial.print(" ");Serial.println("");
+  wifi.send(ID_UDP, buf_send, BUFLEN);
 
   //更新雷达机
   if(rdd >= 180 || !rdd)
@@ -142,7 +145,7 @@ for(int i=0;i<13;i++)Serial.print((int)buf_send[i]),Serial.print(" ");Serial.pri
 
   //接收控制指令
   static uint8_t buf_recv[BUFLEN] = {1, 2, 3, 4, 5};
-  if(!wifi.recv(udp_id, buf_recv, BUFLEN, TIMEOUT_WIFI))
+  if(!wifi.recv(ID_UDP, buf_recv, BUFLEN, TIMEOUT_WIFI))
   {
     lost_cnt++;
     return;
